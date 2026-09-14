@@ -1,0 +1,11 @@
+name: "no_implicit_prelude"
+description: "确保带有 #![no_implicit_prelude] 的文件不被修改"
+input: |
+  #![no_implicit_prelude]
+
+  impl ::std::fmt::Display for MyType {
+      fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+          Ok(())
+      }
+  }
+expected: null

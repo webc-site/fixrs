@@ -1,0 +1,24 @@
+name: macro_definition_and_invocation
+description: 宏定义内部不替换，宏调用处参数正常替换
+input: |
+  macro_rules! my_macro {
+      () => {
+          wbase::time::now_secs()
+      };
+  }
+
+  pub fn call_macro() {
+      let msg = format!("now: {}", wbase::time::now_secs());
+  }
+expected: |
+  use wbase::time::now_secs;
+
+  macro_rules! my_macro {
+      () => {
+          wbase::time::now_secs()
+      };
+  }
+
+  pub fn call_macro() {
+      let msg = format!("now: {}", now_secs());
+  }

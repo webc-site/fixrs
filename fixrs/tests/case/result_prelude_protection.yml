@@ -1,0 +1,37 @@
+name: "result_prelude_protection"
+input: |
+  pub enum Status {
+    Ok,
+    BufError,
+  }
+
+  pub struct ErrorMessage;
+
+  impl core::fmt::Debug for ErrorMessage {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+      write!(f, "err")
+    }
+  }
+
+  pub fn do_work() -> Result<Status, ()> {
+    Ok(Status::Ok)
+  }
+expected: |
+  use core::fmt;
+
+  pub enum Status {
+    Ok,
+    BufError,
+  }
+
+  pub struct ErrorMessage;
+
+  impl fmt::Debug for ErrorMessage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+      write!(f, "err")
+    }
+  }
+
+  pub fn do_work() -> Result<Status, ()> {
+    Ok(Status::Ok)
+  }

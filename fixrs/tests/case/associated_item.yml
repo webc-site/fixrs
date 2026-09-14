@@ -1,0 +1,13 @@
+name: associated_item
+description: 关联函数与枚举变体智能保留类型段并导入类型
+input: |
+  pub fn run() {
+      let err = std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "failed");
+  }
+expected: |
+  use std::io::Error;
+  use std::io::ErrorKind;
+
+  pub fn run() {
+      let err = Error::new(ErrorKind::ConnectionRefused, "failed");
+  }

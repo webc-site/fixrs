@@ -1,0 +1,12 @@
+name: fn_param_shadowing
+description: 验证函数形参名称与绝对路径末尾标识符同名时，自动提升保留两段以防局部遮蔽
+input: |
+  pub fn check_limit(min: usize, max: usize) -> usize {
+      core::cmp::min(min, max)
+  }
+expected: |
+  use core::cmp;
+
+  pub fn check_limit(min: usize, max: usize) -> usize {
+      cmp::min(min, max)
+  }

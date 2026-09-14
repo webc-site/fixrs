@@ -1,0 +1,12 @@
+name: qself_as_trait
+description: QSelf 限定语法中的 Trait 路径与 as 替换
+input: |
+  pub fn my_func() {
+      let _ = <MyStruct as wbase::convert::MyTrait>::foo();
+  }
+expected: |
+  use wbase::convert::MyTrait;
+
+  pub fn my_func() {
+      let _ = <MyStruct as MyTrait>::foo();
+  }

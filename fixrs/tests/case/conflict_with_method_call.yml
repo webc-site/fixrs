@@ -1,0 +1,16 @@
+name: conflict_with_method_call
+description: 带有方法调用的长路径在类型名冲突时正确向上提升模块
+input: |
+  use anyhow::Error;
+
+  pub fn run() {
+    let _ = std::io::Error::new(std::io::ErrorKind::Other, "msg");
+  }
+expected: |
+  use anyhow::Error;
+  use std::io;
+  use std::io::ErrorKind;
+
+  pub fn run() {
+    let _ = io::Error::new(ErrorKind::Other, "msg");
+  }

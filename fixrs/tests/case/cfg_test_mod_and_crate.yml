@@ -1,0 +1,46 @@
+name: cfg_test_mod_and_crate
+description: crate路径提取与cfg(test)内嵌模块路径提取
+options:
+  extra_crates: ["a", "x"]
+input: |
+  pub fn run() {
+    let _ = crate::foo::bar::baz();
+  }
+
+  #[test]
+  fn standalone_test() {
+    let _ = a::b::test_helper();
+  }
+
+  #[cfg(test)]
+  mod tests {
+    use super::*;
+
+    #[test]
+    fn inner_test() {
+      let _ = x::y::z();
+    }
+  }
+expected: |
+  use a::b::test_helper;
+  use crate::foo::bar::baz;
+
+  pub fn run() {
+    let _ = baz();
+  }
+
+  #[test]
+  fn standalone_test() {
+    let _ = test_helper();
+  }
+
+  #[cfg(test)]
+  mod tests {
+    use super::*;
+    use x::y::z;
+
+    #[test]
+    fn inner_test() {
+      let _ = z();
+    }
+  }

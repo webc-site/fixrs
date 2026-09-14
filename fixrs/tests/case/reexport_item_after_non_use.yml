@@ -1,0 +1,19 @@
+name: reexport_item_after_non_use
+description: 验证文件中间（非 use item 之后）出现的 pub use 重导出，不影响顶部 use 块的准确插入位置
+input: |
+  use std::fs::File;
+
+  pub fn run_task() {
+      let _ = std::io::Error::last_os_error();
+  }
+
+  pub use std::path::*;
+expected: |
+  use std::fs::File;
+  use std::io::Error;
+
+  pub fn run_task() {
+      let _ = Error::last_os_error();
+  }
+
+  pub use std::path::*;

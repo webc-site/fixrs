@@ -1,0 +1,24 @@
+name: cfg_with_existing_use
+description: 当已有顶层use时，cfg条件编译内部的代码可安全复用已有use进行路径简化，且不插入新的未保护use
+input: |
+  use std::io;
+
+  pub struct Service;
+
+  impl Service {
+    #[cfg(feature = "extra")]
+    pub fn extra_call(&self) {
+      let _ = std::io::Error::new(std::io::ErrorKind::Other, "err");
+    }
+  }
+expected: |
+  use std::io;
+
+  pub struct Service;
+
+  impl Service {
+    #[cfg(feature = "extra")]
+    pub fn extra_call(&self) {
+      let _ = io::Error::new(io::ErrorKind::Other, "err");
+    }
+  }

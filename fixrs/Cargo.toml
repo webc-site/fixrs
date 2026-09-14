@@ -1,0 +1,49 @@
+[package]
+name = "fixrs"
+version = "0.1.6"
+edition = "2024"
+license = "MulanPSL-2.0"
+repository = "https://github.com/webc-site/fixrs.git"
+homepage = "https://github.com/webc-site/fixrs/tree/main/fixrs"
+description = "Blazing-fast CLI to replace Rust qualified paths with use statements, auto-fixing clippy::absolute_paths"
+keywords = ["clippy", "refactoring", "ast", "cli", "linter"]
+categories = ["development-tools", "command-line-utilities"]
+
+[[bin]]
+name = "fixrs"
+path = "src/bin/fixrs.rs"
+
+[[bin]]
+name = "cargo-fixrs"
+path = "src/bin/cargo_fixrs.rs"
+
+[features]
+default = []
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+bitcode = "0.6.9"
+clap = { version = "4.6.6", features = ["derive"] }
+clap_args = { version = "0.1.9", features = ["macro"] }
+compio = "0.19.2"
+current_platform = "0.2.0"
+dirs = "7.0.0"
+ignore = "0.4.33"
+memchr = "2.8.3"
+museair = "0.6.0"
+proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
+quote = "1.0.47"
+syn = { version = "3.0.5", features = ["full", "visit"] }
+thiserror = "2.0.20"
+toml = "1.1.6"
+
+[dev-dependencies]
+aok = "0.1.18"
+ctor = "1.0.13"
+log = "0.4.34"
+log_init = "0.1.39"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_yaml = "0.9.34"

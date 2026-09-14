@@ -1,0 +1,15 @@
+name: conflict_multi_errors
+description: 同名类型导入冲突时自动保留上一级模块避免重名编译报错
+input: |
+  pub fn run() {
+      let e1: core::fmt::Error;
+      let e2: std::io::Error;
+  }
+expected: |
+  use core::fmt;
+  use std::io;
+
+  pub fn run() {
+      let e1: fmt::Error;
+      let e2: io::Error;
+  }

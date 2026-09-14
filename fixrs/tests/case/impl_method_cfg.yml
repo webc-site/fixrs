@@ -1,0 +1,29 @@
+name: "impl_method_cfg"
+input: |
+  pub struct Compressor;
+
+  impl Compressor {
+    pub fn normal(&self) {
+      core::ptr::null::<u8>();
+    }
+
+    #[cfg(feature = "extra")]
+    pub fn extra_feature(&self) {
+      core::ptr::null_mut::<u8>();
+    }
+  }
+expected: |
+  use core::ptr::null;
+
+  pub struct Compressor;
+
+  impl Compressor {
+    pub fn normal(&self) {
+      null::<u8>();
+    }
+
+    #[cfg(feature = "extra")]
+    pub fn extra_feature(&self) {
+      core::ptr::null_mut::<u8>();
+    }
+  }

@@ -1,0 +1,15 @@
+name: existing_use_shadowing
+description: 当文件已存在 pub use 导入同名符号时，自动提升保留上级模块导入以避免冲突
+input: |
+  pub use std::error::Error;
+
+  pub fn run() {
+      let e: std::io::Error;
+  }
+expected: |
+  pub use std::error::Error;
+  use std::io;
+
+  pub fn run() {
+      let e: io::Error;
+  }

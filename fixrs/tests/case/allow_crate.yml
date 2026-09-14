@@ -1,0 +1,10 @@
+name: allow_crate
+description: 白名单中的crate保持绝对路径不被替换
+options:
+  allow_crates:
+    - wbase
+input: |
+  pub fn foo() {
+      let now = wbase::time::now_secs();
+  }
+expected: null

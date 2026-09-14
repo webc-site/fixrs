@@ -1,0 +1,17 @@
+name: conflict_both_aliased
+description: 同一文件内多个外部crate核心类型均冲突时，分别生成对应规范别名
+options:
+  extra_crates: ["async_lock", "parking_lot"]
+input: |
+  pub fn run() {
+    let _ = parking_lot::Mutex::new(0);
+    let _ = async_lock::Mutex::new(0);
+  }
+expected: |
+  use async_lock::Mutex as AsyncLockMutex;
+  use parking_lot::Mutex as ParkingLotMutex;
+
+  pub fn run() {
+    let _ = ParkingLotMutex::new(0);
+    let _ = AsyncLockMutex::new(0);
+  }

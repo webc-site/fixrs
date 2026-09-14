@@ -1,0 +1,22 @@
+name: inner_attr_cfg_file
+description: 文件顶层包含模块文档注释与内层属性 #![cfg(...)] 时，插入的 use 必须置于 #![cfg(...)] 之后，保护整个文件
+options:
+  extra_crates: ["compio"]
+input: |
+  //! TLS 端到端集成测试
+
+  #![cfg(feature = "tls")]
+
+  pub fn run() {
+    let _ = compio::time::Duration::from_secs(1);
+  }
+expected: |
+  //! TLS 端到端集成测试
+
+  #![cfg(feature = "tls")]
+
+  use compio::time::Duration;
+
+  pub fn run() {
+    let _ = Duration::from_secs(1);
+  }

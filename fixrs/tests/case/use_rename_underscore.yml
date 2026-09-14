@@ -1,0 +1,22 @@
+name: use_rename_underscore
+description: 验证 use path::{Item as _} 匿名导入不影响同名类型的遮蔽保护
+options:
+  extra_crates:
+    - serde
+input: |
+  use serde::de::{Error as _};
+
+  pub struct Error;
+
+  pub fn handle_error<E: serde::de::Error>(err: E) {
+      let _ = Error;
+  }
+expected: |
+  use serde::de::{Error as _};
+  use serde::de;
+
+  pub struct Error;
+
+  pub fn handle_error<E: de::Error>(err: E) {
+      let _ = Error;
+  }

@@ -1,0 +1,12 @@
+name: top_level_shadowing
+description: 与本文件已有函数同名时自动回退保留上一级模块避免递归或遮蔽
+input: |
+  pub fn abort() {
+      std::process::abort();
+  }
+expected: |
+  use std::process;
+
+  pub fn abort() {
+      process::abort();
+  }

@@ -1,0 +1,23 @@
+name: local_struct_shadowing
+description: 验证函数内局部声明的 struct/item 与 trait 路径同名时，自动保留两段防止 trait/struct 混淆
+options:
+  extra_crates:
+    - serde
+input: |
+  pub fn run_deserialize() {
+      struct Visitor;
+
+      impl<'de> serde::de::Visitor<'de> for Visitor {
+          type Value = ();
+      }
+  }
+expected: |
+  use serde::de;
+
+  pub fn run_deserialize() {
+      struct Visitor;
+
+      impl<'de> de::Visitor<'de> for Visitor {
+          type Value = ();
+      }
+  }

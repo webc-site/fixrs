@@ -1,0 +1,22 @@
+name: use_self_group
+description: 验证 use foo::{self, ...} 导入自身模块后，内部绝对路径不重复注入模块 use
+input: |
+  use core::fmt::{self, Debug};
+
+  pub struct MyType;
+
+  impl MyType {
+      pub fn format(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+          Ok(())
+      }
+  }
+expected: |
+  use core::fmt::{self, Debug};
+
+  pub struct MyType;
+
+  impl MyType {
+      pub fn format(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+          Ok(())
+      }
+  }

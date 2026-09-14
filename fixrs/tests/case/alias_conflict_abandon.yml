@@ -1,0 +1,13 @@
+name: alias_conflict_abandon
+description: 当生成的别名（如 AsyncLockMutex）与本地已有符号亦发生冲突时，放弃改写保持原样
+options:
+  extra_crates: ["async_lock", "parking_lot"]
+input: |
+  use parking_lot::Mutex;
+
+  pub struct AsyncLockMutex;
+
+  pub fn run() {
+    let _ = async_lock::Mutex::new(0);
+  }
+expected: null

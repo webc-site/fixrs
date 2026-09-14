@@ -1,0 +1,8 @@
+name: cfg_item_protection
+description: 带有 cfg 或 cfg_attr 条件编译特性的 item，其内部路径不提取为顶层无条件 use
+input: |
+  pub struct ParseError;
+
+  #[cfg(feature = "std")]
+  impl std::error::Error for ParseError {}
+expected: null

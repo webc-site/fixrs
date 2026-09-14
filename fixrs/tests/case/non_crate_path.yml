@@ -1,0 +1,11 @@
+name: non_crate_path
+description: 已导入的局部模块名不是 extern crate 时，不误当做绝对长路径改写
+options:
+  extra_crates: []
+input: |
+  use std::io;
+
+  pub fn run() {
+      let err = io::Error::new(io::ErrorKind::Other, "test");
+  }
+expected: null

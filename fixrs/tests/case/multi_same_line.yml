@@ -1,0 +1,12 @@
+name: multi_same_line
+description: 同一行多次调用相同绝对路径应全部精准替换
+input: |
+  pub fn check() {
+      let diff = wbase::time::now_secs() - wbase::time::now_secs();
+  }
+expected: |
+  use wbase::time::now_secs;
+
+  pub fn check() {
+      let diff = now_secs() - now_secs();
+  }

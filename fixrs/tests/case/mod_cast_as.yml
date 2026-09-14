@@ -1,0 +1,12 @@
+name: mod_cast_as
+description: 模块内带有 as 类型转换的长路径修复及同名常量冲突防护
+input: |
+  pub mod time_stamp {
+      pub const TICKS_PER_SECOND: u64 = wbase::convert::TICKS_PER_SECOND as u64;
+  }
+expected: |
+  pub mod time_stamp {
+      use wbase::convert;
+
+      pub const TICKS_PER_SECOND: u64 = convert::TICKS_PER_SECOND as u64;
+  }

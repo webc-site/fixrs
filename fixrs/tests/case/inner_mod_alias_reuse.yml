@@ -1,0 +1,22 @@
+name: inner_mod_alias_reuse
+description: 当嵌套子模块无 use super::* 且复用外层别名时，在子模块内部补全对应的别名 use
+options:
+  extra_crates: ["async_lock"]
+input: |
+  use async_lock::Mutex as AsyncLockMutex;
+
+  mod inner {
+    pub fn run() {
+      let _ = async_lock::Mutex::new(0);
+    }
+  }
+expected: |
+  use async_lock::Mutex as AsyncLockMutex;
+
+  mod inner {
+    use async_lock::Mutex as AsyncLockMutex;
+
+    pub fn run() {
+      let _ = AsyncLockMutex::new(0);
+    }
+  }

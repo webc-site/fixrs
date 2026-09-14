@@ -1,0 +1,15 @@
+name: basic
+description: 基础绝对长路径替换并注入use
+input: |
+  use std::fs;
+
+  pub fn my_func() {
+      let now = wbase::time::now_secs();
+  }
+expected: |
+  use std::fs;
+  use wbase::time::now_secs;
+
+  pub fn my_func() {
+      let now = now_secs();
+  }

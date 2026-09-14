@@ -1,0 +1,17 @@
+name: conflict_enum_variants
+description: 同名枚举变体路径在多个不同模块存在时正确检测冲突并提升模块
+options:
+  extra_crates: ["custom"]
+input: |
+  pub fn run() {
+    let _ = std::io::ErrorKind::Other;
+    let _ = custom::net::ErrorKind::Other;
+  }
+expected: |
+  use custom::net;
+  use std::io;
+
+  pub fn run() {
+    let _ = io::ErrorKind::Other;
+    let _ = net::ErrorKind::Other;
+  }

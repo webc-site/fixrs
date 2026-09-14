@@ -1,0 +1,12 @@
+name: generic_call
+description: 带泛型参数的路径调用不应产生重复泛型
+input: |
+  pub fn alloc<T>() -> *mut T {
+      core::ptr::null_mut::<u8>()
+  }
+expected: |
+  use core::ptr::null_mut;
+
+  pub fn alloc<T>() -> *mut T {
+      null_mut::<u8>()
+  }

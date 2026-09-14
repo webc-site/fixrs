@@ -1,0 +1,20 @@
+- title: "Prune full path import on call sites"
+  comment_url: "https://github.com/getfloresta/Floresta/issues/1073#issuecomment-5662187697"
+
+- title: "fixrs: Blazing-fast CLI and library to auto-fix clippy::absolute_paths and clean long imports"
+  comment_url: "https://github.com/rust-lang/rust-clippy/discussions/17738"
+
+- title: "docs(conventions): add import and error handling conventions"
+  comment_url: "https://github.com/guacsec/trustify/pull/2655#issuecomment-5662871222"
+
+- title: "Catch undeclared (unimported) absolute paths"
+  comment_url: "https://github.com/rust-lang/rust-clippy/discussions/12002#discussioncomment-18432709"
+
+- title: "Adopt written import and qualified-path standards, and sweep the codebase to match"
+  comment_url: "https://github.com/talelburg/eldritch/issues/890#issuecomment-5662917207"
+
+- title: "Refactor codebase to avoid fully qualified paths in type usage"
+  comment_url: "https://github.com/cloud-hypervisor/cloud-hypervisor/issues/7670#issuecomment-5662918607"
+
+- title: "chore(lints): close the remaining gaps against praxis"
+  comment_url: "https://github.com/praxis-proxy/policy/issues/15#issuecomment-5662934688"

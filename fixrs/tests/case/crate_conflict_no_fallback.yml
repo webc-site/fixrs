@@ -1,0 +1,9 @@
+name: crate_conflict_no_fallback
+description: crate路径在与本地符号冲突时，不向上回退为use crate
+input: |
+  use std::error::Error;
+
+  pub fn run() {
+    let _ = crate::Error::Misuse("err");
+  }
+expected: null

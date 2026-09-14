@@ -1,0 +1,16 @@
+name: existing_alias_reuse
+description: 当源码已存在 use ... as 别名导入时，自动复用已有别名简化长路径且不重复插入
+options:
+  extra_crates: ["async_lock"]
+input: |
+  use async_lock::Mutex as AsyncLockMutex;
+
+  pub fn run() {
+    let _ = async_lock::Mutex::new(0);
+  }
+expected: |
+  use async_lock::Mutex as AsyncLockMutex;
+
+  pub fn run() {
+    let _ = AsyncLockMutex::new(0);
+  }
