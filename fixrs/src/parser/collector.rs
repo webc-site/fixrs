@@ -1,4 +1,6 @@
-use syn::{Item, Path, spanned::Spanned};
+use std::fmt;
+
+use syn::{Item, Path, Token, spanned::Spanned};
 
 use super::{path::QualifiedPath, scope::FileScope};
 use crate::{hash::HashSet, options::Options};
@@ -209,7 +211,11 @@ impl<'a> PathCollector<'a> {
 
     // 作用域冲突保护：若末尾项已被当前作用域占用或与当前函数参数/局部变量同名，提升保留两段
     let is_shadowed = current_mod.scope.in_scope_idents.contains(last_ident)
-      || self.local_idents.iter().rev().any(|ident| ident.as_str() == last_ident);
+      || self
+        .local_idents
+        .iter()
+        .rev()
+        .any(|ident| ident.as_str() == last_ident);
 
     if keep_count == 1
       && !current_mod.scope.existing_use_paths.contains(full_import)
@@ -255,6 +261,143 @@ impl<'a> PathCollector<'a> {
       segments: seg_strings,
       span: path.span(),
     });
+  }
+
+  /// 扫描宏调用内部的 TokenStream，提取其中的绝对路径（如 DSL 宏中的 => ::core::ffi::c_int 或 [*mut ::ulua_vm::...]）
+  pub(crate) fn inspect_token_stream(&mut self, stream: proc_macro2::TokenStream) {
+    let trees: Vec<proc_macro2::TokenTree> = stream.into_iter().collect();
+    let len = trees.len();
+    let mut i = 0;
+
+    #[inline]
+    fn is_double_colon(
+      t1: Option<&proc_macro2::TokenTree>,
+      t2: Option<&proc_macro2::TokenTree>,
+    ) -> bool {
+      match (t1, t2) {
+        (Some(proc_macro2::TokenTree::Punct(p1)), Some(proc_macro2::TokenTree::Punct(p2))) => {
+          p1.as_char() == ':' && p1.spacing() == proc_macro2::Spacing::Joint && p2.as_char() == ':'
+        }
+        _ => false,
+      }
+    }
+
+    #[inline]
+    fn collect_remaining_segments(
+      trees: &[proc_macro2::TokenTree],
+      mut curr: usize,
+      segments: &mut Vec<proc_macro2::Ident>,
+    ) -> usize {
+      while is_double_colon(trees.get(curr), trees.get(curr + 1)) {
+        if let Some(proc_macro2::TokenTree::Ident(next_ident)) = trees.get(curr + 2) {
+          segments.push(next_ident.clone());
+          curr += 3;
+        } else {
+          break;
+        }
+      }
+      curr
+    }
+
+    #[inline]
+    fn to_path(leading_colon: Option<Token![::]>, segments: Vec<proc_macro2::Ident>) -> syn::Path {
+      syn::Path {
+        leading_colon,
+        segments: segments
+          .into_iter()
+          .map(|seg| syn::PathSegment {
+            ident: seg,
+            arguments: syn::PathArguments::None,
+          })
+          .collect(),
+      }
+    }
+
+    struct StackBuf<const N: usize> {
+      buf: [u8; N],
+      len: usize,
+    }
+
+    impl<const N: usize> fmt::Write for StackBuf<N> {
+      #[inline]
+      fn write_str(&mut self, s: &str) -> fmt::Result {
+        let bytes = s.as_bytes();
+        if self.len + bytes.len() <= N {
+          self.buf[self.len..self.len + bytes.len()].copy_from_slice(bytes);
+          self.len += bytes.len();
+          Ok(())
+        } else {
+          Err(fmt::Error)
+        }
+      }
+    }
+
+    #[inline]
+    fn is_ident_known_crate(ident: &proc_macro2::Ident, known_crates: &HashSet<String>) -> bool {
+      if ident == "crate" {
+        return true;
+      }
+      let mut buf = StackBuf::<64> {
+        buf: [0u8; 64],
+        len: 0,
+      };
+      use std::fmt::Write;
+      if write!(&mut buf, "{ident}").is_ok()
+        && let Ok(s) = str::from_utf8(&buf.buf[..buf.len])
+      {
+        return known_crates.contains(s);
+      }
+      known_crates.contains(&ident.to_string())
+    }
+
+    while i < len {
+      match &trees[i] {
+        proc_macro2::TokenTree::Group(group) => {
+          self.inspect_token_stream(group.stream());
+          i += 1;
+        }
+        proc_macro2::TokenTree::Punct(p1)
+          if p1.as_char() == ':'
+            && p1.spacing() == proc_macro2::Spacing::Joint
+            && trees.get(i + 1).is_some_and(
+              |p2| matches!(p2, proc_macro2::TokenTree::Punct(p) if p.as_char() == ':'),
+            ) =>
+        {
+          if let Some(proc_macro2::TokenTree::Ident(first_ident)) = trees.get(i + 2) {
+            let leading_colon = Some(Token![::]([p1.span(), trees[i + 1].span()]));
+            let mut segments = Vec::with_capacity(4);
+            segments.push(first_ident.clone());
+            let curr = collect_remaining_segments(&trees, i + 3, &mut segments);
+            if segments.len() > self.max_segments {
+              self.inspect_path(&to_path(leading_colon, segments));
+            }
+            i = curr;
+          } else {
+            i += 1;
+          }
+        }
+        proc_macro2::TokenTree::Ident(first_ident) => {
+          if is_double_colon(trees.get(i + 1), trees.get(i + 2))
+            && is_ident_known_crate(first_ident, self.known_crates)
+            && let Some(proc_macro2::TokenTree::Ident(second_ident)) = trees.get(i + 3)
+          {
+            let mut segments = Vec::with_capacity(4);
+            segments.push(first_ident.clone());
+            segments.push(second_ident.clone());
+            let curr = collect_remaining_segments(&trees, i + 4, &mut segments);
+            if segments.len() > self.max_segments {
+              self.inspect_path(&to_path(None, segments));
+            }
+            i = curr;
+          } else {
+            i += 1;
+          }
+        }
+        _ => {
+          i += 1;
+        }
+      }
+    }
   }
 }
 

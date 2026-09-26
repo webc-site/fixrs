@@ -226,19 +226,33 @@ impl<'ast> Visit<'ast> for PathCollector<'_> {
     }
   }
 
-  fn visit_item_macro(&mut self, _i: &'ast syn::ItemMacro) {
-    // 宏定义（macro_rules!）内部绝对不替换，直接跳过！
+  fn visit_item_macro(&mut self, i: &'ast syn::ItemMacro) {
+    // 宏定义（macro_rules! i.ident.is_some()）内部绝对不替换，直接跳过
+    if i.ident.is_none() {
+      let cfg = self.enter_cfg(&i.attrs);
+      self.visit_macro(&i.mac);
+      self.exit_cfg(cfg);
+    }
   }
 
   fn visit_macro(&mut self, i: &'ast Macro) {
-    // 宏调用处（如 format!(...), println!(...), vec![...] 等）
+    // 宏调用处（如 format!(...), println!(...), vec![...], capi_shell!(...) 等）
     if self.use_depth == 0 && self.attr_depth == 0 {
       self.inspect_path(&i.path);
 
+      if i.tokens.is_empty() {
+        return;
+      }
+
       let parser = Punctuated::<syn::Expr, Token![,]>::parse_terminated;
-      if let Ok(exprs) = parser.parse2(i.tokens.clone()) {
-        for expr in &exprs {
-          self.visit_expr(expr);
+      match parser.parse2(i.tokens.clone()) {
+        Ok(exprs) => {
+          for expr in &exprs {
+            self.visit_expr(expr);
+          }
+        }
+        Err(_) => {
+          self.inspect_token_stream(i.tokens.clone());
         }
       }
     }

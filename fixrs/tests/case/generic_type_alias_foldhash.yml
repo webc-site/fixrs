@@ -1,0 +1,18 @@
+name: generic_type_alias_foldhash
+description: 类型别名泛型参数中已知 crate 绝对路径改写，且当已存在 use 时不重复引入
+options:
+  extra_crates:
+    - foldhash
+    - hashbrown
+input: |
+  use foldhash::fast::FixedState;
+
+  pub type DeterministicHashMap<K, V> = hashbrown::HashMap<K, V, foldhash::fast::FixedState>;
+
+  pub type DeterministicHashSet<T> = hashbrown::HashSet<T, foldhash::fast::FixedState>;
+expected: |
+  use foldhash::fast::FixedState;
+
+  pub type DeterministicHashMap<K, V> = hashbrown::HashMap<K, V, FixedState>;
+
+  pub type DeterministicHashSet<T> = hashbrown::HashSet<T, FixedState>;

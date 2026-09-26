@@ -261,3 +261,77 @@ pub fn test() {
 
   OK
 }
+
+#[test]
+fn test_workspace_members_and_macro_shell() -> Void {
+  use fixrs::{load_project_crates, process_file};
+
+  let temp = temp_dir().join(format!("fixrs_ws_test_{}", id()));
+  create_dir_all(temp.join("crates/member/src"))?;
+
+  write(
+    temp.join("Cargo.toml"),
+    r#"
+[workspace]
+resolver = "3"
+members = ["crates/member"]
+"#,
+  )?;
+
+  write(
+    temp.join("Cargo.lock"),
+    r#"
+[[package]]
+name = "foldhash"
+version = "0.2.0"
+"#,
+  )?;
+
+  write(
+    temp.join("crates/member/Cargo.toml"),
+    r#"
+[package]
+name = "member"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hashbrown = "0.17"
+"#,
+  )?;
+
+  let src_file = temp.join("crates/member/src/lib.rs");
+  write(
+    &src_file,
+    r#"capi_shell!(tpack, "ulua_tpack", tpack, [
+  l state,
+  => ::core::ffi::c_int,
+]);
+"#,
+  )?;
+
+  let loaded = load_project_crates(&temp, &[]);
+  assert!(
+    loaded.contains("foldhash"),
+    "应从 Cargo.lock 中识别 foldhash"
+  );
+  assert!(
+    loaded.contains("hashbrown"),
+    "应从 member/Cargo.toml 中识别 hashbrown"
+  );
+  assert!(loaded.contains("member"), "应识别 workspace member");
+
+  let opts = Options::default();
+  let res = process_file(&src_file, &opts)?;
+  assert!(res.is_some(), "应当成功改写 macro DSL 中的绝对路径");
+  let fixed = res.unwrap();
+  assert!(
+    fixed.contains("use core::ffi::c_int;"),
+    "应注入 use core::ffi::c_int;"
+  );
+  assert!(fixed.contains("=> c_int,"), "应改写为 => c_int,");
+
+  let _ = remove_dir_all(&temp);
+
+  OK
+}

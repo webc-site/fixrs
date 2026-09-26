@@ -1,0 +1,30 @@
+name: macro_capi_shell
+description: 顶层宏调用及包含自定义 DSL 的宏参数中绝对路径与类型的自动改写
+options:
+  extra_crates:
+    - ulua_vm
+input: |
+  //! 本文件由自动生成
+  capi_shell!(tpack, "ulua_tpack", tpack, [
+    l state,
+    => ::core::ffi::c_int,
+  ]);
+
+  capi_shell!(lua_v_tryfunc_tm, "ulua_lua_v_tryfunc_tm", lua_v_tryfunc_tm, [
+    l ptr [*mut ::ulua_vm::records::lua_state::LuaState] "contract",
+    func stkid,
+  ]);
+expected: |
+  //! 本文件由自动生成
+  use core::ffi::c_int;
+  use ulua_vm::records::lua_state::LuaState;
+
+  capi_shell!(tpack, "ulua_tpack", tpack, [
+    l state,
+    => c_int,
+  ]);
+
+  capi_shell!(lua_v_tryfunc_tm, "ulua_lua_v_tryfunc_tm", lua_v_tryfunc_tm, [
+    l ptr [*mut LuaState] "contract",
+    func stkid,
+  ]);

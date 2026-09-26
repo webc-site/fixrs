@@ -1,0 +1,12 @@
+name: generic_type_alias_no_existing_use
+description: 类型别名泛型参数中已知 crate 绝对路径改写，自动注入缺失的 use 语句
+options:
+  extra_crates:
+    - foldhash
+    - hashbrown
+input: |
+  pub type DeterministicHashSet<T> = hashbrown::HashSet<T, foldhash::fast::FixedState>;
+expected: |
+  use foldhash::fast::FixedState;
+
+  pub type DeterministicHashSet<T> = hashbrown::HashSet<T, FixedState>;
