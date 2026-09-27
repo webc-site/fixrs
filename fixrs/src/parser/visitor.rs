@@ -431,32 +431,36 @@ fn item_attrs(item: &Item) -> &[Attribute] {
   }
 }
 
+const PROTECTED_MACROS: &[&str] = &[
+  "asm",
+  "cfg",
+  "column",
+  "compile_error",
+  "concat",
+  "env",
+  "file",
+  "global_asm",
+  "include",
+  "include_bytes",
+  "include_str",
+  "line",
+  "module_path",
+  "naked_asm",
+  "option_env",
+  "parse_quote",
+  "parse_quote_spanned",
+  "quote",
+  "quote_spanned",
+  "stringify",
+];
+
 /// 判定宏是否为代码生成模板、语法构造、内联汇编或反射字面量宏
 /// 此类宏内部的路径与标识符绝不能被改写，以保护宏的语法格式与语义
 #[inline]
 fn is_protected_macro(mac: &Macro) -> bool {
-  let Some(seg) = mac.path.segments.last() else {
-    return false;
-  };
-  let id = &seg.ident;
-  id == "quote"
-    || id == "quote_spanned"
-    || id == "parse_quote"
-    || id == "parse_quote_spanned"
-    || id == "stringify"
-    || id == "concat"
-    || id == "include_str"
-    || id == "include_bytes"
-    || id == "include"
-    || id == "env"
-    || id == "option_env"
-    || id == "asm"
-    || id == "global_asm"
-    || id == "naked_asm"
-    || id == "compile_error"
-    || id == "file"
-    || id == "line"
-    || id == "column"
-    || id == "module_path"
-    || id == "cfg"
+  mac
+    .path
+    .segments
+    .last()
+    .is_some_and(|seg| PROTECTED_MACROS.iter().any(|&p| seg.ident == p))
 }

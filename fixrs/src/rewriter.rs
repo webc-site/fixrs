@@ -154,14 +154,10 @@ fn is_ident_char(b: u8) -> bool {
 }
 
 #[inline]
-fn is_valid_boundary(line_bytes: &[u8], start: usize, len: usize, starts_with_colon: bool) -> bool {
+fn is_valid_boundary(line_bytes: &[u8], start: usize, len: usize) -> bool {
   if start > 0 {
     let prev = line_bytes[start - 1];
-    if starts_with_colon {
-      if prev == b':' {
-        return false;
-      }
-    } else if is_ident_char(prev) || prev == b':' {
+    if is_ident_char(prev) || prev == b':' {
       return false;
     }
   }
@@ -169,15 +165,59 @@ fn is_valid_boundary(line_bytes: &[u8], start: usize, len: usize, starts_with_co
     if is_ident_char(next) {
       return false;
     }
-    if next == b':' {
-      let is_turbofish = line_bytes.get(start + len + 1) == Some(&b':')
-        && line_bytes.get(start + len + 2) == Some(&b'<');
-      if !is_turbofish {
+    if next == b':' && line_bytes.get(start + len + 1) == Some(&b':') {
+      let mut p = start + len + 2;
+      while p < line_bytes.len() && (line_bytes[p] == b' ' || line_bytes[p] == b'\t') {
+        p += 1;
+      }
+      if line_bytes.get(p) != Some(&b'<') {
         return false;
       }
     }
   }
   true
+}
+
+#[inline]
+fn find_valid(
+  line_text: &str,
+  needle: &str,
+  line_bytes: &[u8],
+  start_offset: usize,
+) -> Option<usize> {
+  if line_text[start_offset..].starts_with(needle)
+    && is_valid_boundary(line_bytes, start_offset, needle.len())
+  {
+    return Some(start_offset);
+  }
+  let mut search_from = start_offset;
+  while let Some(rel) = line_text[search_from..].find(needle) {
+    let pos = search_from + rel;
+    if is_valid_boundary(line_bytes, pos, needle.len()) {
+      return Some(pos);
+    }
+    search_from = pos + 1;
+  }
+  None
+}
+
+#[inline]
+fn find_match(
+  line_text: &str,
+  target: &str,
+  trimmed_target: &str,
+  line_bytes: &[u8],
+  start_offset: usize,
+) -> Option<(usize, usize)> {
+  if let Some(pos) = find_valid(line_text, target, line_bytes, start_offset) {
+    return Some((pos, target.len()));
+  }
+  if target != trimmed_target
+    && let Some(pos) = find_valid(line_text, trimmed_target, line_bytes, start_offset)
+  {
+    return Some((pos, trimmed_target.len()));
+  }
+  None
 }
 
 /// 根据导入路径与符号特征生成重命名候选别名（遵循 RFC 430 命名规范）
@@ -352,41 +392,15 @@ pub fn rewrite_modules_with_offsets(
       };
 
       let line_bytes = line_text.as_bytes();
-      let target_starts_colon = target.starts_with(':');
 
-      let check_cand = |pos: usize, len: usize, is_colon: bool| {
-        if is_valid_boundary(line_bytes, pos, len, is_colon) {
-          Some((pos, len))
-        } else {
-          None
-        }
-      };
-
-      let match_info = if line_text[start_search..].starts_with(target)
-        && let Some(m) = check_cand(start_search, target.len(), target_starts_colon)
-      {
-        Some(m)
-      } else if line_text[start_search..].starts_with(trimmed_target)
-        && let Some(m) = check_cand(start_search, trimmed_target.len(), false)
-      {
-        Some(m)
-      } else if let Some(pos) = line_text[start_search..].find(target)
-        && let Some(m) = check_cand(start_search + pos, target.len(), target_starts_colon)
-      {
-        Some(m)
-      } else if let Some(pos) = line_text[start_search..].find(trimmed_target)
-        && let Some(m) = check_cand(start_search + pos, trimmed_target.len(), false)
-      {
-        Some(m)
-      } else if let Some(pos) = line_text.find(target)
-        && let Some(m) = check_cand(pos, target.len(), target_starts_colon)
-      {
-        Some(m)
-      } else {
-        line_text
-          .find(trimmed_target)
-          .and_then(|pos| check_cand(pos, trimmed_target.len(), false))
-      };
+      let match_info = find_match(line_text, target, trimmed_target, line_bytes, start_search)
+        .or_else(|| {
+          if start_search > 0 {
+            find_match(line_text, target, trimmed_target, line_bytes, 0)
+          } else {
+            None
+          }
+        });
 
       let Some((col_start, matched_len)) = match_info else {
         continue;

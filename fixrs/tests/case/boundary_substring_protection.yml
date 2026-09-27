@@ -5,11 +5,13 @@ options:
     - wbase
 input: |
   pub fn check() {
-      let _ = wbase::time::now_secs();
+      let _ = bad_wbase::time::now_secs();
+      let _ = (bad_wbase::time::now_secs(), wbase::time::now_secs());
   }
 expected: |
   use wbase::time::now_secs;
 
   pub fn check() {
-      let _ = now_secs();
+      let _ = bad_wbase::time::now_secs();
+      let _ = (bad_wbase::time::now_secs(), now_secs());
   }

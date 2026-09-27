@@ -387,3 +387,45 @@ pub fn generate() {
 
   OK
 }
+
+#[test]
+fn test_boundary_advanced_protections() -> Void {
+  use fixrs::{Options, fix_str};
+
+  let input = r#"
+pub fn check() {
+    let _ = bad_wbase::time::now_secs();
+    let _ = (bad_wbase::time::now_secs(), wbase::time::now_secs());
+    let _ = ::wbase::time::parse::<u64>("123");
+    macro_rules! my_dsl {
+        ($p:expr) => {};
+    }
+    my_dsl!(wbase::time::now_secs: 100);
+}
+"#;
+  let mut options = Options::default();
+  options.extra_crates.push("wbase".to_string());
+  let res = fix_str(input, &options)?;
+  assert!(res.is_some(), "应当成功改写有效路径");
+  let fixed = res.unwrap();
+  assert!(fixed.contains("use wbase::time::now_secs;"));
+  assert!(fixed.contains("use wbase::time::parse;"));
+  assert!(
+    fixed.contains("bad_wbase::time::now_secs()"),
+    "前缀路径不得被误伤改写"
+  );
+  assert!(
+    fixed.contains("let _ = (bad_wbase::time::now_secs(), now_secs());"),
+    "同行无效前缀后的有效路径应被正确改写"
+  );
+  assert!(
+    fixed.contains("parse::<u64>(\"123\")"),
+    "turbofish 泛型调用应被完整保留"
+  );
+  assert!(
+    fixed.contains("my_dsl!(now_secs: 100);"),
+    "单冒号分隔边界宏参数应被正确识别与改写"
+  );
+
+  OK
+}

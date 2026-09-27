@@ -1,4 +1,7 @@
-use std::fmt;
+use std::{
+  fmt::{self, Write},
+  str,
+};
 
 use proc_macro2::{Spacing, TokenTree};
 use syn::{Item, Path, PathArguments, Token, spanned::Spanned};
@@ -88,17 +91,17 @@ impl<'a> PathCollector<'a> {
       return;
     }
 
-    let first_str = first_ident.to_string();
-
     // 若非全局 :: 绝对路径，检查是否属于已知 extern crate（已知集合非空时生效）
-    // 采用 O(1) 哈希查询，彻底消除原本 O(N) 的线性扫描开销
+    // 采用栈缓冲区与 O(1) 哈希查询，在排除非目标 crate 路径时彻底消除堆分配与线性扫描开销
     if path.leading_colon.is_none()
       && !is_crate
       && !self.known_crates.is_empty()
-      && !self.known_crates.contains(&first_str)
+      && !is_ident_known_crate(first_ident, self.known_crates)
     {
       return;
     }
+
+    let first_str = first_ident.to_string();
 
     let mut seg_strings = Vec::with_capacity(total_segments);
     seg_strings.push(first_str);
@@ -270,87 +273,6 @@ impl<'a> PathCollector<'a> {
     let len = trees.len();
     let mut i = 0;
 
-    #[inline]
-    fn is_double_colon(
-      t1: Option<&proc_macro2::TokenTree>,
-      t2: Option<&proc_macro2::TokenTree>,
-    ) -> bool {
-      match (t1, t2) {
-        (Some(TokenTree::Punct(p1)), Some(TokenTree::Punct(p2))) => {
-          p1.as_char() == ':' && p1.spacing() == Spacing::Joint && p2.as_char() == ':'
-        }
-        _ => false,
-      }
-    }
-
-    #[inline]
-    fn collect_remaining_segments(
-      trees: &[proc_macro2::TokenTree],
-      mut curr: usize,
-      segments: &mut Vec<proc_macro2::Ident>,
-    ) -> usize {
-      while is_double_colon(trees.get(curr), trees.get(curr + 1)) {
-        if let Some(TokenTree::Ident(next_ident)) = trees.get(curr + 2) {
-          segments.push(next_ident.clone());
-          curr += 3;
-        } else {
-          break;
-        }
-      }
-      curr
-    }
-
-    #[inline]
-    fn to_path(leading_colon: Option<Token![::]>, segments: Vec<proc_macro2::Ident>) -> syn::Path {
-      syn::Path {
-        leading_colon,
-        segments: segments
-          .into_iter()
-          .map(|seg| syn::PathSegment {
-            ident: seg,
-            arguments: PathArguments::None,
-          })
-          .collect(),
-      }
-    }
-
-    struct StackBuf<const N: usize> {
-      buf: [u8; N],
-      len: usize,
-    }
-
-    impl<const N: usize> fmt::Write for StackBuf<N> {
-      #[inline]
-      fn write_str(&mut self, s: &str) -> fmt::Result {
-        let bytes = s.as_bytes();
-        if self.len + bytes.len() <= N {
-          self.buf[self.len..self.len + bytes.len()].copy_from_slice(bytes);
-          self.len += bytes.len();
-          Ok(())
-        } else {
-          Err(fmt::Error)
-        }
-      }
-    }
-
-    #[inline]
-    fn is_ident_known_crate(ident: &proc_macro2::Ident, known_crates: &HashSet<String>) -> bool {
-      if ident == "crate" {
-        return true;
-      }
-      let mut buf = StackBuf::<64> {
-        buf: [0u8; 64],
-        len: 0,
-      };
-      use std::fmt::Write;
-      if write!(&mut buf, "{ident}").is_ok()
-        && let Ok(s) = str::from_utf8(&buf.buf[..buf.len])
-      {
-        return known_crates.contains(s);
-      }
-      known_crates.contains(&ident.to_string())
-    }
-
     while i < len {
       match &trees[i] {
         TokenTree::Group(group) => {
@@ -399,6 +321,98 @@ impl<'a> PathCollector<'a> {
         }
       }
     }
+  }
+}
+
+struct StackBuf<const N: usize> {
+  buf: [u8; N],
+  len: usize,
+}
+
+impl<const N: usize> StackBuf<N> {
+  #[inline]
+  const fn new() -> Self {
+    Self {
+      buf: [0u8; N],
+      len: 0,
+    }
+  }
+
+  #[inline]
+  fn as_str(&self) -> Option<&str> {
+    str::from_utf8(&self.buf[..self.len]).ok()
+  }
+}
+
+impl<const N: usize> fmt::Write for StackBuf<N> {
+  #[inline]
+  fn write_str(&mut self, s: &str) -> fmt::Result {
+    let bytes = s.as_bytes();
+    if self.len + bytes.len() <= N {
+      self.buf[self.len..self.len + bytes.len()].copy_from_slice(bytes);
+      self.len += bytes.len();
+      Ok(())
+    } else {
+      Err(fmt::Error)
+    }
+  }
+}
+
+#[inline]
+fn is_ident_known_crate(ident: &proc_macro2::Ident, known_crates: &HashSet<String>) -> bool {
+  if ident == "crate" {
+    return true;
+  }
+  let mut buf = StackBuf::<64>::new();
+  if write!(&mut buf, "{ident}").is_ok()
+    && let Some(s) = buf.as_str()
+  {
+    return known_crates.contains(s);
+  }
+  known_crates.contains(&ident.to_string())
+}
+
+#[inline]
+fn is_double_colon(
+  t1: Option<&proc_macro2::TokenTree>,
+  t2: Option<&proc_macro2::TokenTree>,
+) -> bool {
+  match (t1, t2) {
+    (Some(TokenTree::Punct(p1)), Some(TokenTree::Punct(p2))) => {
+      p1.as_char() == ':' && p1.spacing() == Spacing::Joint && p2.as_char() == ':'
+    }
+    _ => false,
+  }
+}
+
+#[inline]
+fn collect_remaining_segments(
+  trees: &[proc_macro2::TokenTree],
+  mut curr: usize,
+  segments: &mut Vec<proc_macro2::Ident>,
+) -> usize {
+  while is_double_colon(trees.get(curr), trees.get(curr + 1)) {
+    if let Some(TokenTree::Ident(next_ident)) = trees.get(curr + 2) {
+      segments.push(next_ident.clone());
+      curr += 3;
+    } else {
+      break;
+    }
+  }
+  curr
+}
+
+#[inline]
+fn to_path(leading_colon: Option<Token![::]>, segments: Vec<proc_macro2::Ident>) -> syn::Path {
+  syn::Path {
+    leading_colon,
+    segments: segments
+      .into_iter()
+      .map(|seg| syn::PathSegment {
+        ident: seg,
+        arguments: PathArguments::None,
+      })
+      .collect(),
   }
 }
 
