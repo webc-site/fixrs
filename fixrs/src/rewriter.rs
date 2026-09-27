@@ -148,6 +148,38 @@ fn append_snake(s: &str, out: &mut String) {
   }
 }
 
+#[inline]
+fn is_ident_char(b: u8) -> bool {
+  b.is_ascii_alphanumeric() || b == b'_'
+}
+
+#[inline]
+fn is_valid_boundary(line_bytes: &[u8], start: usize, len: usize, starts_with_colon: bool) -> bool {
+  if start > 0 {
+    let prev = line_bytes[start - 1];
+    if starts_with_colon {
+      if prev == b':' {
+        return false;
+      }
+    } else if is_ident_char(prev) || prev == b':' {
+      return false;
+    }
+  }
+  if let Some(&next) = line_bytes.get(start + len) {
+    if is_ident_char(next) {
+      return false;
+    }
+    if next == b':' {
+      let is_turbofish = line_bytes.get(start + len + 1) == Some(&b':')
+        && line_bytes.get(start + len + 2) == Some(&b'<');
+      if !is_turbofish {
+        return false;
+      }
+    }
+  }
+  true
+}
+
 /// 根据导入路径与符号特征生成重命名候选别名（遵循 RFC 430 命名规范）
 fn generate_alias_candidates(import: &str) -> Vec<String> {
   let import = import.strip_prefix("::").unwrap_or(import);
@@ -319,20 +351,41 @@ pub fn rewrite_modules_with_offsets(
           .unwrap_or(line_text.len())
       };
 
-      let match_info = if line_text[start_search..].starts_with(target) {
-        Some((start_search, target.len()))
-      } else if line_text[start_search..].starts_with(trimmed_target) {
-        Some((start_search, trimmed_target.len()))
-      } else if let Some(pos) = line_text[start_search..].find(target) {
-        Some((start_search + pos, target.len()))
-      } else if let Some(pos) = line_text[start_search..].find(trimmed_target) {
-        Some((start_search + pos, trimmed_target.len()))
-      } else if let Some(pos) = line_text.find(target) {
-        Some((pos, target.len()))
+      let line_bytes = line_text.as_bytes();
+      let target_starts_colon = target.starts_with(':');
+
+      let check_cand = |pos: usize, len: usize, is_colon: bool| {
+        if is_valid_boundary(line_bytes, pos, len, is_colon) {
+          Some((pos, len))
+        } else {
+          None
+        }
+      };
+
+      let match_info = if line_text[start_search..].starts_with(target)
+        && let Some(m) = check_cand(start_search, target.len(), target_starts_colon)
+      {
+        Some(m)
+      } else if line_text[start_search..].starts_with(trimmed_target)
+        && let Some(m) = check_cand(start_search, trimmed_target.len(), false)
+      {
+        Some(m)
+      } else if let Some(pos) = line_text[start_search..].find(target)
+        && let Some(m) = check_cand(start_search + pos, target.len(), target_starts_colon)
+      {
+        Some(m)
+      } else if let Some(pos) = line_text[start_search..].find(trimmed_target)
+        && let Some(m) = check_cand(start_search + pos, trimmed_target.len(), false)
+      {
+        Some(m)
+      } else if let Some(pos) = line_text.find(target)
+        && let Some(m) = check_cand(pos, target.len(), target_starts_colon)
+      {
+        Some(m)
       } else {
         line_text
           .find(trimmed_target)
-          .map(|pos| (pos, trimmed_target.len()))
+          .and_then(|pos| check_cand(pos, trimmed_target.len(), false))
       };
 
       let Some((col_start, matched_len)) = match_info else {

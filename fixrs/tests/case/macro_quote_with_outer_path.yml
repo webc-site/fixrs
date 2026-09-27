@@ -1,0 +1,27 @@
+name: macro_quote_with_outer_path
+description: 验证宏外部路径正常被改写，而 quote! 内部代码模板中的绝对路径完全受保护保持原样
+options:
+  extra_crates:
+    - ulua_rt
+    - wbase
+input: |
+  use quote::quote;
+
+  pub fn run() {
+      let now = wbase::time::now_secs();
+      let code = quote! {
+          let v = ::ulua_rt::Value::UserData;
+          ::core::result::Result::Ok(v)
+      };
+  }
+expected: |
+  use quote::quote;
+  use wbase::time::now_secs;
+
+  pub fn run() {
+      let now = now_secs();
+      let code = quote! {
+          let v = ::ulua_rt::Value::UserData;
+          ::core::result::Result::Ok(v)
+      };
+  }

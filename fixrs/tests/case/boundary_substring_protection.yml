@@ -1,0 +1,15 @@
+name: boundary_substring_protection
+description: 验证带前缀或后缀的标识符不会被错误匹配为子字符串替换，保持代码格式与边界完整
+options:
+  extra_crates:
+    - wbase
+input: |
+  pub fn check() {
+      let _ = wbase::time::now_secs();
+  }
+expected: |
+  use wbase::time::now_secs;
+
+  pub fn check() {
+      let _ = now_secs();
+  }

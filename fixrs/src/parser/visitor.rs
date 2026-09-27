@@ -30,14 +30,14 @@ impl<'ast> Visit<'ast> for PathCollector<'_> {
   fn visit_impl_item(&mut self, i: &'ast syn::ImplItem) {
     let attrs = match i {
       ImplItem::Const(c) => &c.attrs[..],
-      syn::ImplItem::Fn(f) => &f.attrs[..],
-      syn::ImplItem::Type(t) => &t.attrs[..],
-      syn::ImplItem::Macro(m) => &m.attrs[..],
+      ImplItem::Fn(f) => &f.attrs[..],
+      ImplItem::Type(t) => &t.attrs[..],
+      ImplItem::Macro(m) => &m.attrs[..],
       _ => &[],
     };
     let cfg = self.enter_cfg(attrs);
     let prev_len = self.local_idents.len();
-    if let syn::ImplItem::Fn(f) = i {
+    if let ImplItem::Fn(f) = i {
       collect_sig_inputs(&f.sig, &mut self.local_idents);
     }
     visit_impl_item(self, i);
@@ -48,14 +48,14 @@ impl<'ast> Visit<'ast> for PathCollector<'_> {
   fn visit_trait_item(&mut self, i: &'ast syn::TraitItem) {
     let attrs = match i {
       TraitItem::Const(c) => &c.attrs[..],
-      syn::TraitItem::Fn(f) => &f.attrs[..],
-      syn::TraitItem::Type(t) => &t.attrs[..],
-      syn::TraitItem::Macro(m) => &m.attrs[..],
+      TraitItem::Fn(f) => &f.attrs[..],
+      TraitItem::Type(t) => &t.attrs[..],
+      TraitItem::Macro(m) => &m.attrs[..],
       _ => &[],
     };
     let cfg = self.enter_cfg(attrs);
     let prev_len = self.local_idents.len();
-    if let syn::TraitItem::Fn(f) = i {
+    if let TraitItem::Fn(f) = i {
       collect_sig_inputs(&f.sig, &mut self.local_idents);
     }
     visit_trait_item(self, i);
@@ -86,19 +86,19 @@ impl<'ast> Visit<'ast> for PathCollector<'_> {
       Expr::Let(e) => &e.attrs,
       Expr::Lit(e) => &e.attrs,
       Expr::Loop(e) => &e.attrs,
-      syn::Expr::Macro(e) => &e.attrs,
+      Expr::Macro(e) => &e.attrs,
       Expr::Match(e) => &e.attrs,
       Expr::MethodCall(e) => &e.attrs,
       Expr::Paren(e) => &e.attrs,
       Expr::Path(e) => &e.attrs,
       Expr::Range(e) => &e.attrs,
-      syn::Expr::Reference(e) => &e.attrs,
+      Expr::Reference(e) => &e.attrs,
       Expr::Repeat(e) => &e.attrs,
       Expr::Return(e) => &e.attrs,
-      syn::Expr::Struct(e) => &e.attrs,
+      Expr::Struct(e) => &e.attrs,
       Expr::Try(e) => &e.attrs,
       Expr::TryBlock(e) => &e.attrs,
-      syn::Expr::Tuple(e) => &e.attrs,
+      Expr::Tuple(e) => &e.attrs,
       Expr::Unary(e) => &e.attrs,
       Expr::Unsafe(e) => &e.attrs,
       Expr::While(e) => &e.attrs,
@@ -141,7 +141,7 @@ impl<'ast> Visit<'ast> for PathCollector<'_> {
       Stmt::Local(l) => &l.attrs[..],
       Stmt::Item(it) => item_attrs(it),
       Stmt::Expr(..) => &[],
-      syn::Stmt::Macro(m) => &m.attrs[..],
+      Stmt::Macro(m) => &m.attrs[..],
     };
     let cfg = self.enter_cfg(attrs);
     if let Stmt::Local(l) = i {
@@ -178,8 +178,8 @@ impl<'ast> Visit<'ast> for PathCollector<'_> {
     let attrs = match i {
       ForeignItem::Fn(f) => &f.attrs[..],
       ForeignItem::Static(s) => &s.attrs[..],
-      syn::ForeignItem::Type(t) => &t.attrs[..],
-      syn::ForeignItem::Macro(m) => &m.attrs[..],
+      ForeignItem::Type(t) => &t.attrs[..],
+      ForeignItem::Macro(m) => &m.attrs[..],
       _ => &[],
     };
     let cfg = self.enter_cfg(attrs);
@@ -240,7 +240,8 @@ impl<'ast> Visit<'ast> for PathCollector<'_> {
     if self.use_depth == 0 && self.attr_depth == 0 {
       self.inspect_path(&i.path);
 
-      if i.tokens.is_empty() {
+      // 代码生成/语法模板/内联汇编/反射字面量宏内部的 token 属于外部展开环境或字面量，严禁穿透改写以保护格式与语义
+      if is_protected_macro(i) || i.tokens.is_empty() {
         return;
       }
 
@@ -331,7 +332,7 @@ fn collect_pat_idents(pat: &syn::Pat, out: &mut Vec<String>) {
     Pat::Ident(i) => {
       out.push(i.ident.to_string());
     }
-    syn::Pat::Tuple(t) => {
+    Pat::Tuple(t) => {
       for p in &t.elems {
         collect_pat_idents(p, out);
       }
@@ -341,7 +342,7 @@ fn collect_pat_idents(pat: &syn::Pat, out: &mut Vec<String>) {
         collect_pat_idents(p, out);
       }
     }
-    syn::Pat::Struct(s) => {
+    Pat::Struct(s) => {
       for f in &s.fields {
         collect_pat_idents(&f.pat, out);
       }
@@ -351,10 +352,10 @@ fn collect_pat_idents(pat: &syn::Pat, out: &mut Vec<String>) {
         collect_pat_idents(p, out);
       }
     }
-    syn::Pat::Reference(r) => {
+    Pat::Reference(r) => {
       collect_pat_idents(&r.pat, out);
     }
-    syn::Pat::Type(t) => {
+    Pat::Type(t) => {
       collect_pat_idents(&t.pat, out);
     }
     Pat::Or(o) => {
@@ -428,4 +429,34 @@ fn item_attrs(item: &Item) -> &[Attribute] {
     Item::Use(i) => &i.attrs,
     _ => &[],
   }
+}
+
+/// 判定宏是否为代码生成模板、语法构造、内联汇编或反射字面量宏
+/// 此类宏内部的路径与标识符绝不能被改写，以保护宏的语法格式与语义
+#[inline]
+fn is_protected_macro(mac: &Macro) -> bool {
+  let Some(seg) = mac.path.segments.last() else {
+    return false;
+  };
+  let id = &seg.ident;
+  id == "quote"
+    || id == "quote_spanned"
+    || id == "parse_quote"
+    || id == "parse_quote_spanned"
+    || id == "stringify"
+    || id == "concat"
+    || id == "include_str"
+    || id == "include_bytes"
+    || id == "include"
+    || id == "env"
+    || id == "option_env"
+    || id == "asm"
+    || id == "global_asm"
+    || id == "naked_asm"
+    || id == "compile_error"
+    || id == "file"
+    || id == "line"
+    || id == "column"
+    || id == "module_path"
+    || id == "cfg"
 }

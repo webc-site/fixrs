@@ -1,6 +1,7 @@
 use std::fmt;
 
-use syn::{Item, Path, Token, spanned::Spanned};
+use proc_macro2::{Spacing, TokenTree};
+use syn::{Item, Path, PathArguments, Token, spanned::Spanned};
 
 use super::{path::QualifiedPath, scope::FileScope};
 use crate::{hash::HashSet, options::Options};
@@ -275,8 +276,8 @@ impl<'a> PathCollector<'a> {
       t2: Option<&proc_macro2::TokenTree>,
     ) -> bool {
       match (t1, t2) {
-        (Some(proc_macro2::TokenTree::Punct(p1)), Some(proc_macro2::TokenTree::Punct(p2))) => {
-          p1.as_char() == ':' && p1.spacing() == proc_macro2::Spacing::Joint && p2.as_char() == ':'
+        (Some(TokenTree::Punct(p1)), Some(TokenTree::Punct(p2))) => {
+          p1.as_char() == ':' && p1.spacing() == Spacing::Joint && p2.as_char() == ':'
         }
         _ => false,
       }
@@ -289,7 +290,7 @@ impl<'a> PathCollector<'a> {
       segments: &mut Vec<proc_macro2::Ident>,
     ) -> usize {
       while is_double_colon(trees.get(curr), trees.get(curr + 1)) {
-        if let Some(proc_macro2::TokenTree::Ident(next_ident)) = trees.get(curr + 2) {
+        if let Some(TokenTree::Ident(next_ident)) = trees.get(curr + 2) {
           segments.push(next_ident.clone());
           curr += 3;
         } else {
@@ -307,7 +308,7 @@ impl<'a> PathCollector<'a> {
           .into_iter()
           .map(|seg| syn::PathSegment {
             ident: seg,
-            arguments: syn::PathArguments::None,
+            arguments: PathArguments::None,
           })
           .collect(),
       }
@@ -352,18 +353,18 @@ impl<'a> PathCollector<'a> {
 
     while i < len {
       match &trees[i] {
-        proc_macro2::TokenTree::Group(group) => {
+        TokenTree::Group(group) => {
           self.inspect_token_stream(group.stream());
           i += 1;
         }
-        proc_macro2::TokenTree::Punct(p1)
+        TokenTree::Punct(p1)
           if p1.as_char() == ':'
-            && p1.spacing() == proc_macro2::Spacing::Joint
-            && trees.get(i + 1).is_some_and(
-              |p2| matches!(p2, proc_macro2::TokenTree::Punct(p) if p.as_char() == ':'),
-            ) =>
+            && p1.spacing() == Spacing::Joint
+            && trees
+              .get(i + 1)
+              .is_some_and(|p2| matches!(p2, TokenTree::Punct(p) if p.as_char() == ':')) =>
         {
-          if let Some(proc_macro2::TokenTree::Ident(first_ident)) = trees.get(i + 2) {
+          if let Some(TokenTree::Ident(first_ident)) = trees.get(i + 2) {
             let leading_colon = Some(Token![::]([p1.span(), trees[i + 1].span()]));
             let mut segments = Vec::with_capacity(4);
             segments.push(first_ident.clone());
@@ -376,10 +377,10 @@ impl<'a> PathCollector<'a> {
             i += 1;
           }
         }
-        proc_macro2::TokenTree::Ident(first_ident) => {
+        TokenTree::Ident(first_ident) => {
           if is_double_colon(trees.get(i + 1), trees.get(i + 2))
             && is_ident_known_crate(first_ident, self.known_crates)
-            && let Some(proc_macro2::TokenTree::Ident(second_ident)) = trees.get(i + 3)
+            && let Some(TokenTree::Ident(second_ident)) = trees.get(i + 3)
           {
             let mut segments = Vec::with_capacity(4);
             segments.push(first_ident.clone());

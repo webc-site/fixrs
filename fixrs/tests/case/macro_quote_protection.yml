@@ -1,0 +1,23 @@
+name: macro_quote_protection
+description: 验证 quote! 与 parse_quote! 内部代码模板中的绝对路径及泛型保持原样，不被误改写亦不误引入 use
+options:
+  extra_crates:
+    - ulua_rt
+input: |
+  use proc_macro::TokenStream;
+  use quote::quote;
+  use syn::parse_quote;
+
+  pub fn derive_something() -> TokenStream {
+      let _predicate: syn::WherePredicate = parse_quote!(Self: ::ulua_rt::FromLua);
+      quote! {
+          match value {
+              ::ulua_rt::Value::UserData(ud) => Ok(ud.borrow::<Self>()?.clone()),
+              _ => Err(::ulua_rt::Error::FromLuaConversionError {
+                  from: value.type_name(),
+                  to: ::std::string::String::from("test"),
+              }),
+          }
+      }
+  }
+expected: null

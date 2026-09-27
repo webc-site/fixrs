@@ -6,6 +6,7 @@ use std::{
 };
 
 use aok::{OK, Void};
+use clap::Command;
 use fixrs::{Options, process_file, run};
 use log::info;
 use serde::Deserialize;
@@ -184,7 +185,7 @@ fn test_i18n() -> Void {
   use clap::Args;
   use fixrs::msg;
 
-  let cmd = Options::apply_i18n(Options::augment_args(clap::Command::new("test")));
+  let cmd = Options::apply_i18n(Options::augment_args(Command::new("test")));
   assert_eq!(
     cmd.get_about().map(|s| s.to_string()),
     Some(msg().about.to_string())
@@ -332,6 +333,57 @@ hashbrown = "0.17"
   assert!(fixed.contains("=> c_int,"), "应改写为 => c_int,");
 
   let _ = remove_dir_all(&temp);
+
+  OK
+}
+
+#[test]
+fn test_quote_and_macro_protection() -> Void {
+  use fixrs::{Options, fix_str};
+
+  let input = r#"
+pub fn generate() {
+    let _ = quote! {
+        let val: ::ulua_rt::Value = ::ulua_rt::Value::UserData;
+        ::core::result::Result::Ok(val)
+    };
+    let _ = parse_quote!(Self: ::ulua_rt::FromLua);
+    let _ = stringify!(::std::collections::HashMap);
+}
+"#;
+  let mut options = Options::default();
+  options.extra_crates.push("ulua_rt".to_string());
+  let res = fix_str(input, &options)?;
+  assert!(
+    res.is_none(),
+    "quote!/parse_quote!/stringify! 内部路径受保护，不应触发改写"
+  );
+
+  let input_with_outer = r#"
+pub fn generate() {
+    let _now = wbase::time::now_secs();
+    let _ = quote! {
+        ::ulua_rt::Value::UserData
+    };
+}
+"#;
+  options.extra_crates.push("wbase".to_string());
+  let res = fix_str(input_with_outer, &options)?;
+  assert!(res.is_some(), "外部路径应正常改写");
+  let fixed = res.unwrap();
+  assert!(
+    fixed.contains("use wbase::time::now_secs;"),
+    "外部路径应引入 use"
+  );
+  assert!(fixed.contains("now_secs()"), "外部路径应简化");
+  assert!(
+    fixed.contains("::ulua_rt::Value::UserData"),
+    "quote! 内部路径应完整保留"
+  );
+  assert!(
+    !fixed.contains("use ulua_rt"),
+    "不应引入 quote! 内部类型的 use"
+  );
 
   OK
 }

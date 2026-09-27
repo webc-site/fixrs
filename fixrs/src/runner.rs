@@ -284,7 +284,10 @@ pub fn run(options: &Options) -> Result<ProcessSummary> {
       }
 
       if opts.should_write() {
-        let formatted = format_source(res.content.as_bytes(), Some(&project_root));
+        let formatted = format_source(
+          res.content.as_bytes(),
+          file.parent().or(Some(&project_root)),
+        );
         let to_write = formatted.as_deref().unwrap_or(res.content.as_bytes());
         fs::write(&file, to_write)?;
         if !opts.no_cache

@@ -1,0 +1,11 @@
+name: macro_stringify_and_literal_protection
+description: 验证 stringify! 等宏内的绝对路径不被替换以保护字面量语义
+options:
+  extra_crates:
+    - wbase
+input: |
+  pub fn check() {
+      let s = stringify!(::std::collections::HashMap);
+      let s2 = stringify!(wbase::time::now_secs);
+  }
+expected: null
